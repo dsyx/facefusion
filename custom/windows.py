@@ -1,4 +1,5 @@
 import contextlib
+import io
 import os
 import site
 import sys
@@ -19,12 +20,10 @@ def setup() -> None:
 
 
 def setup_terminal_encoding() -> None:
-	if hasattr(sys.stdout, 'reconfigure'):
-		with contextlib.suppress(Exception):
-			sys.stdout.reconfigure(encoding='utf-8')
-	if hasattr(sys.stderr, 'reconfigure'):
-		with contextlib.suppress(Exception):
-			sys.stderr.reconfigure(encoding='utf-8')
+	for stream in (sys.stdout, sys.stderr):
+		if isinstance(stream, io.TextIOWrapper):
+			with contextlib.suppress(Exception):
+				stream.reconfigure(encoding='utf-8')
 	os.environ['PYTHONUTF8'] = '1'
 
 

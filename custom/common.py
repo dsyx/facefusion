@@ -20,10 +20,14 @@ def bypass_content_analyser() -> None:
 	def mock_analysis(*args: Any, **kwargs: Any) -> bool:
 		return False
 
-	content_analyser.pre_check = lambda: True
-	content_analyser.analyse_image = lru_cache(mock_analysis)
-	content_analyser.analyse_video = lru_cache(mock_analysis)
-	content_analyser.analyse_stream = mock_analysis
-	content_analyser.analyse_frame = mock_analysis
-	content_analyser.detect_nsfw = mock_analysis
+	overrides = {
+		'pre_check': lambda: True,
+		'analyse_image': lru_cache(mock_analysis),
+		'analyse_video': lru_cache(mock_analysis),
+		'analyse_stream': mock_analysis,
+		'analyse_frame': mock_analysis,
+		'detect_nsfw': mock_analysis,
+	}
 
+	for name, func in overrides.items():
+		setattr(content_analyser, name, func)
