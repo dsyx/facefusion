@@ -5,3 +5,4 @@
 ## 文档索引
 
 - [安装指南](document/installation.md)。
+- [调参指南](document/tuning.md)。
