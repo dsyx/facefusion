@@ -1,4 +1,4 @@
-from custom import common, windows
+from custom.patch import common, windows
 from facefusion.common_helper import is_windows
 
 
