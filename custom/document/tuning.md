@@ -161,15 +161,15 @@ Choices: many, retinaface, scrfd, yolo_face, yunet
 Default: yolo_face
 ```
 
-各模型在国际人脸检测标准基准 WIDER FACE（按尺度、姿态、遮挡难度划分为 Easy、Medium、Hard 三个验证子集）上的平均精度（AP，Average Precision）与 $640 \times 480$ 分辨率下的十亿次浮点运算（GFLOPs，Giga Floating-point Operations）开销对比如下：
+各模型在国际人脸检测标准基准 WIDER FACE（按尺度、姿态、遮挡难度划分为 Easy、Medium、Hard 三个验证子集）上的平均精度（AP，Average Precision）与十亿次浮点运算（GFLOPs，Giga Floating-point Operations）开销对比如下：
 
 | 模型 | 底层权重 | 参数量 | 算力 | WIDER FACE AP ($\uparrow$)<br/>(Easy / Medium / Hard) | 架构特性 | 适用场景 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `many` | `retinaface_10g` + `scrfd_2.5g` + `yoloface_8n` | ~7.54M | 20.6 GFLOPs | - | 并行汇总三组候选框，经非极大值抑制（NMS，Non-Maximum Suppression，阈值 `0.1`）去重融合 | 极端疑难帧兜底（计算耗时叠加） |
-| `retinaface` | `retinaface_10g` | ~3.86M | 10.0 GFLOPs | **95.2% / 93.9% / 83.1%** | 级联多任务密集锚框回归，复杂尺度特征金字塔增强 | 远景微小人脸、重度遮挡与暗光场景首选 |
-| `scrfd` | `scrfd_2.5g` | ~0.67M | 2.5 GFLOPs | 93.8% / 92.2% / 77.9% | 基于样本与计算重分配的高效特征金字塔架构 | 侧脸与大角度动作高性价比抓取 |
-| `yolo_face` | `yoloface_8n` | ~3.01M | 8.1 GFLOPs | 93.8% / 91.8% / 79.4% | 无锚框（Anchor-Free）单阶段直接回归架构，背景误检率低 | 正脸及中近景高速通用检测 |
-| `yunet` | `yunet_2023_mar` | ~0.076M | 0.14 GFLOPs | 88.4% / 86.6% / 75.0% | 深度可分离卷积毫秒级超微型设计 | 无独显或纯中央处理器（CPU，Central Processing Unit）轻量推理 |
+| `many` | `retinaface_10g` + `scrfd_2.5g` + `yoloface_8n` | ~8.06M | ~20.6 GFLOPs | - | 并行汇总三组候选框，经非极大值抑制（NMS，Non-Maximum Suppression）去重融合（阈值 `0.1`） | 极端疑难帧兜底（计算耗时叠加） |
+| `retinaface` | `retinaface_10g`<br/>(`SCRFD_10G_KPS`) | ~4.23M | 10.0 GFLOPs (640×480) | **95.4% / 94.0% / 82.8%** | 沿用 InsightFace `RetinaFace` 接口命名，底层实为高容量 `SCRFD-10GF` 密集锚框与 5 点关键点多任务网络 | 远景微小人脸、重度遮挡与暗光场景首选 |
+| `scrfd` | `scrfd_2.5g`<br/>(`SCRFD_2.5G_KPS`) | ~0.82M | 2.5 GFLOPs (640×480) | 93.8% / 92.0% / 77.1% | 基于样本与计算重分配（SCRFD，Sample and Computation Redistribution for Efficient Face Detection）的轻量级特征金字塔架构 | 侧脸与大角度动作高性价比抓取 |
+| `yolo_face` | `yoloface_8n` | ~3.01M | 8.1 GFLOPs (640×640) | 93.8% / 91.8% / 79.4% | 无锚框（Anchor-Free）单阶段直接回归架构，背景误检率低 | 正脸及中近景高速通用检测 |
+| `yunet` | `yunet_2023_mar` | ~0.076M | 0.14 GFLOPs (640×480) | 88.4% / 86.6% / 75.0% | 深度可分离卷积毫秒级超微型设计 | 无独显或纯中央处理器（CPU，Central Processing Unit）轻量推理 |
 
 > 参考：
 > - [`facefusion/face_detector.py:create_static_model_set()`](../../facefusion/face_detector.py)
@@ -261,7 +261,7 @@ Default: 2dfan4
 | 模型 | 算法架构与回归机制 | 基准特性与置信度机制 | 适用场景 |
 | :--- | :--- | :--- | :--- |
 | `2dfan4` | 4 层堆叠沙漏网络（Stacked Hourglass Network），输出高斯热力图；暗光下（CIE Lab 亮度均值 $< 30$）自动启用对比度受限自适应直方图均衡化（CLAHE，Contrast Limited Adaptive Histogram Equalization）增强 | 300-W 基准 NME ~3.5%，热力图空间约束强，输出真实热力峰值置信度 | 抗局部遮挡与中近景五官定位稳健，适合绝大多数常规及半遮挡视频 |
-| `hrffa` | 基于 DINOv3 ViT-L/16 知识蒸馏的大角度鲁棒快速人脸对齐网络（HRFFA，High-Angle Robust Fast Face Alignment），将检测框外扩 $1.7\times$ 覆盖完整头部后直接回归坐标 | 专为极端俯仰角（$\pm 85^\circ$）、偏航角（$\pm 90^\circ$）及 $360^\circ$ 翻滚角设计；底层硬编码置信度恒为 `1.0` | 大幅度仰头/低头、大角度侧脸及剧烈运动镜头首选 |
+| `hrffa` | 以 DINOv3 ViT-L/16 为教师网络知识蒸馏出的大角度鲁棒快速人脸对齐网络（HRFFA，High-Angle Robust Fast Face Alignment）轻量学生模型，将检测框外扩 $1.7\times$ 覆盖完整头部后直接回归坐标 | 专为极端俯仰角（$\pm 85^\circ$）、偏航角（$\pm 90^\circ$）及 $360^\circ$ 翻滚角设计；底层硬编码置信度恒为 `1.0` | 大幅度仰头/低头、大角度侧脸及剧烈运动镜头首选 |
 | `many` | 并行运行 `2dfan4` 与 `peppa_wutz` | 当 $\text{score}_{\text{2dfan4}} > \text{score}_{\text{peppa\_wutz}} - 0.2$ 时优先采纳 `2dfan4`，否则由 `peppa_wutz` 兜底 | 复杂姿态与暗光交替场景的双模冗余增强 |
 | `peppa_wutz` | 轻量级卷积直接回归网络，同样支持暗光 CLAHE 增强 | 推理开销低，但在大表情与大侧脸场景下的 NME 高于热力图架构 | 低算力环境单跑，或配合 `many` 模式作为置信度互补 |
 
@@ -273,7 +273,7 @@ $$\min_{M} \sum_{i=1}^5 \left\| M \begin{bmatrix} x_i \\ y_i \\ 1 \end{bmatrix} 
 > - [`facefusion/face_landmarker.py:detect_face_landmark()`](../../facefusion/face_landmarker.py)
 > - [`facefusion/face_helper.py:estimate_matrix_by_face_landmark_5()`](../../facefusion/face_helper.py)
 > - [How far are we from solving the 2D & 3D Face Alignment problem? (ICCV 2017)](https://arxiv.org/abs/1703.07332)
-> - [HRFFA: High-Angle Robust Fast Face Alignment (PINTO0309)](https://github.com/PINTO0309/HRFFA)
+> - [HRFFA: High-Angle Robust Fast Face Alignment (PINTO0309)](https://github.com/PINTO0309/High-Angle_Robust_Fast_FaceAlignment)
 
 ### 人脸关键点置信度 (Face Landmarker Score)
 
@@ -285,7 +285,13 @@ Default: 0.5
 Note: Avoid setting this to 1.0 when using hrffa, as hrffa uses a fixed confidence score of 1.0 and requires a threshold strictly below 1.0
 ```
 
-人脸关键点检测置信度阈值。当 68 点关键点模型的检测得分高于该阈值时，系统将其收敛转换为高精度 5 点对齐基准；若低于阈值，则回退采用人脸检测器输出的初始 5 点关键点（不会丢弃人脸）；设为 `0` 时直接跳过 68 点关键点模型推理。
+人脸关键点检测置信度阈值。FaceFusion 采用双层关键点处理管线：第一层常驻无条件运行 `fan_68_5` 模型，基于检测器输出的初始 5 点关键点回归初始 68 点（`'68/5'`），用于估算头部姿态旋转角及提供全局拓扑兜底；第二层由 `face_landmarker_score` 控制精修流程：
+- 当阈值 $> 0$ 时，触发所选第二级 68 点精修模型（`2dfan4` / `peppa_wutz` / `hrffa`）的推理；若精修得分高于该阈值，系统采纳精修 68 点并收敛映射为高精度 5 点关键点（`'5/68'`），供下游特征提取与仿射对齐；
+- 若得分低于阈值或设为 `0`（跳过第二级精修模型），系统将直接回退采用人脸检测器输出的初始 5 点关键点（不会丢弃人脸）。
+
+> 参考：
+> - [`facefusion/face_creator.py:create_faces()`](../../facefusion/face_creator.py)
+> - [`facefusion/face_landmarker.py:estimate_face_landmark_68_5()`](../../facefusion/face_landmarker.py)
 
 ## 人脸筛选、定位与时序跟踪
 
@@ -588,14 +594,14 @@ Choices: codeformer, gfpgan_1.2, gfpgan_1.3, gfpgan_1.4, gpen_bfr_256, gpen_bfr_
 Default: gfpgan_1.4
 ```
 
-盲人脸修复（Blind Face Restoration）模型在学术界统一采用合成测试集 CelebA-Test 的学习感知图像块相似度（LPIPS，Learned Perceptual Image Patch Similarity）、身份特征夹角（Identity Angle）及三大真实退化测试集 LFW-Test（轻度退化）、WebPhoto-Test（网络压缩退化）、Wider-Test（重度模糊退化）的 FID 衡量修复表现：
+盲人脸修复（BFR，Blind Face Restoration）模型在学术界标准基准评测中，常采用合成测试集 CelebA-Test 的学习感知图像块相似度（LPIPS，Learned Perceptual Image Patch Similarity）、身份特征相似度（IDS，Identity Score）或身份特征距离（IDD，Identity Distance）及三大真实退化测试集 LFW-Test（轻度退化）、WebPhoto-Test（网络压缩退化）、Wider-Test（重度模糊退化）的 FID 衡量修复表现：
 
-| 模型 | 核心先验架构 | CelebA-Test<br/>(LPIPS ($\downarrow$) / 身份特征夹角 ($\downarrow$)) | 真实退化集 FID ($\downarrow$)<br/>(LFW / WebPhoto / Wider) | 适用场景 |
+| 模型 | 核心先验架构 | CelebA-Test<br/>(LPIPS ($\downarrow$) / IDS ($\uparrow$)) | 真实退化集 FID ($\downarrow$)<br/>(LFW / WebPhoto / Wider) | 适用场景 |
 | :--- | :--- | :--- | :--- | :--- |
-| `codeformer` | 离散矢量量化码本（Vector Quantized Codebook）+ Transformer 全局上下文查表 | 0.291 / 24.7° | 52.02 / 78.40 / **39.06** | 重度模糊与低清修复首选；五官线条锐利，支持连续调节生成细节与原貌保真度权重 |
-| `gfpgan_1.2`<br/>`gfpgan_1.3`<br/>`gfpgan_1.4` | 预训练 StyleGAN2 生成面部先验（Generative Facial Prior）+ 通道分割空间特征变换（Channel-Split Spatial Feature Transform） | 0.365 / 34.6° | 49.96 / 87.35 / 50.86 | `1.2 → 1.4` 逐步修正眼齿伪影；推理速度快、肤色平滑讨喜，适合常规清晰度视频打底（首选 `1.4`） |
-| `gpen_bfr_256`<br/>`gpen_bfr_512`<br/>`gpen_bfr_1024`<br/>`gpen_bfr_2048` | 将 StyleGAN 生成器块直接嵌入 U-Net 编码-解码器，支持多尺度原生训练 | 0.399 / 30.6° | 57.58 / 82.02 / 46.39 | 高分辨率档位在 4K 大特写镜头中重建的毛孔微纹理最细腻，但显存与耗时随尺寸成倍增加 |
-| `restoreformer_plus_plus` | 重构导向多头交叉注意力（Reconstruction-Oriented Multi-Head Cross-Attention），融合退化特征与高清字典键值对先验 | **0.289 / 23.8°** | **48.11 / 77.33** / 49.84 | 相比传统 GAN 模型不易产生塑胶涂抹感或改变换脸后的五官神态，适合高保真影视精修 |
+| `codeformer` | 离散矢量量化码本（Vector Quantized Codebook）+ Transformer 全局上下文查表 | **0.299 / 0.60** | 52.02 / 78.87 / **39.06** | 重度模糊与低清修复首选；五官线条锐利，支持连续调节生成细节与原貌保真度权重 |
+| `gfpgan_1.2`<br/>`gfpgan_1.3`<br/>`gfpgan_1.4` | 预训练 StyleGAN2 生成面部先验（GFP，Generative Facial Prior）+ 通道分割空间特征变换（CS-SFT，Channel-Split Spatial Feature Transform） | 0.391 / 0.42 | 49.96 / 87.35 / 40.59 | `1.2 → 1.4` 逐步修正眼齿伪影；推理速度快、肤色平滑讨喜，适合常规清晰度视频打底（首选 `1.4`） |
+| `gpen_bfr_256`<br/>`gpen_bfr_512`<br/>`gpen_bfr_1024`<br/>`gpen_bfr_2048` | 将 StyleGAN 生成器块直接嵌入 U-Net 编码-解码器，支持多尺度原生训练 | 0.349 / 0.54 | 57.58 / 81.77 / 46.99 | 高分辨率档位在 4K 大特写镜头中重建的毛孔微纹理最细腻，但显存与耗时随尺寸成倍增加 |
+| `restoreformer_plus_plus` | 重构导向多头交叉注意力（Reconstruction-Oriented Multi-Head Cross-Attention）+ 扩展退化模型（EDM，Extended Degradation Model），多尺度融合退化特征与高清字典先验 | 0.344 / - <br/>(IDD 29.63°) | **48.48 / 74.21** / 40.86 | 相比传统 GAN 模型不易产生塑胶涂抹感或改变换脸后的五官神态，真实中轻度与网络退化集 FID 最优，适合高保真影视精修 |
 
 > 参考：
 > - [`facefusion/processors/modules/face_enhancer/core.py:create_static_model_set()`](../../facefusion/processors/modules/face_enhancer/core.py)
@@ -751,15 +757,16 @@ Default: bisenet_resnet_34
 Note: Only effective when region is enabled in FACE MASK TYPES
 ```
 
-基于双边分割网络（BiSeNet，Bilateral Segmentation Network，融合空间路径与上下文路径）并在 CelebAMask-HQ（包含 30,000 张高清人脸的 19 类面部器官像素级标注基准）上训练，以平均交并比（mIoU，Mean Intersection over Union）衡量分割精度：
+基于融合空间路径与上下文路径的双边分割网络（BiSeNet，Bilateral Segmentation Network），并在 CelebAMask-HQ（包含 30,000 张高清人脸的 19 类面部器官像素级标注基准）上训练导出（权重源自开源项目 `yakhyo/face-parsing`），各骨干网络配置对比如下：
 
-| 模型 | 参数量 | CelebAMask-HQ mIoU ($\uparrow$) | 分割与性能特性 | 适用场景 |
-| :--- | :--- | :--- | :--- | :--- |
-| `bisenet_resnet_18` | ~13.3M | 76.5% | 单帧推理耗时比 `bisenet_resnet_34` 低约 35%，大块区域分割稳定 | 仅需粗粒度器官遮罩（如单独替换或排除 `mouth` / `skin`）且追求高吞吐速度时选用 |
-| `bisenet_resnet_34` | ~23.4M | **78.6%** | 细小部位（`glasses` 镜框、上下唇线边界）的 F1 分数（F1-Score）高出 1.5% ~ 2.5% | 需精准抠除细框眼镜或精细分离上下唇时必选 |
+| 模型 | 底层骨干网络 | 参数量 | 推理时延 / 性能特性 | 分割边界特性 | 适用场景 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `bisenet_resnet_18` | ResNet-18 | ~13.3M | 单帧推理耗时约 2.45ms，比 ResNet-34 快约 28% ~ 35% | 大块平坦面部区域分割稳定，边缘细节略有平滑 | 仅需粗粒度器官遮罩（如单独替换或排除 `mouth` / `skin`）且追求高吞吐速度时选用 |
+| `bisenet_resnet_34` | ResNet-34 | ~23.4M | 单帧推理耗时约 3.38ms，显存开销与计算复杂度略高 | 细小部位（`glasses` 镜框、上下唇线边界）分割边界更锐利精细 | 需精准抠除细框眼镜或精细分离上下唇时必选 |
 
 > 参考：
 > - [`facefusion/face_masker.py:create_region_mask()`](../../facefusion/face_masker.py)
+> - [Face Parsing in PyTorch (yakhyo)](https://github.com/yakhyo/face-parsing)
 > - [BiSeNet: Bilateral Segmentation Network for Real-time Semantic Segmentation (ECCV 2018)](https://arxiv.org/abs/1808.00897)
 > - [MaskGAN: Towards Diverse and Interactive Facial Image Manipulation - CelebAMask-HQ (CVPR 2020)](https://arxiv.org/abs/1907.11922)
 
@@ -881,7 +888,7 @@ Note: For NVENC, avoid setting quality to 100 (-cq 0 disables constant quality a
 
 系统将输入的质量数值 $q$ 线性反向换算为底层编码器的量化与速率控制参数：
 - CPU 软件编码器（`libx264`、`libx265`）：使用恒定速率因子（CRF，Constant Rate Factor），基于心理视觉模型动态调节宏块量化步长。
-- NVIDIA NVENC 硬件编码器（`h264_nvenc`、`hevc_nvenc`）：使用恒定质量级别（CQ，Constant Quality），约束硬件可变码率的目标量化基准。
+- NVIDIA NVENC 硬件编码器（`h264_nvenc`、`hevc_nvenc`）：使用恒定质量级别（CQ，Constant Quality），约束硬件 VBR 的目标量化基准。
 
 $$\text{CRF / CQ} = \text{round}\left(51 \times \left(1 - \frac{q}{100}\right)\right)$$
 
