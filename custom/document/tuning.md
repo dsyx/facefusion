@@ -892,22 +892,22 @@ Note: For NVENC, avoid setting quality to 100 (-cq 0 disables constant quality a
 
 $$\text{CRF / CQ} = \text{round}\left(51 \times \left(1 - \frac{q}{100}\right)\right)$$
 
+主流编码器的推荐档位与底层参数映射如下：
+
+| 画质档位 | `libx264` (CRF) | `libx265` (CRF) | `h264_nvenc` (CQ) | `hevc_nvenc` (CQ) | 典型适用场景与 VMAF 表现 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 数学无损 | `100` (`-crf 0`) | `100` (`-crf 0`) | - | - | 无损母版归档与中间无损渲染，体积庞大（VMAF 100） |
+| 视觉无损 | `65` (`-crf 18`) | `60` (`-crf 20`) | `65` (`-cq 18`) | `60` (`-cq 20`) | 达人眼感知透明门槛（VMAF ≥ 96），微观特写大片首选 |
+| 高质成片 | `60` (`-crf 20`) | `55` (`-crf 23`) | `60` (`-cq 20`) | `55` (`-cq 23`) | 甜点画质（VMAF 93~95），体积较视觉无损锐减约 35%，正式成片导出首选 |
+| 标准均衡 | `55` (`-crf 23`) | `45` (`-crf 28`) | `55` (`-cq 23`) | `50` (`-cq 26`) | 官方基准平衡线（VMAF 86~92），网络流媒体分发与常规分享 |
+| 排雷草稿 | `45` (`-crf 28`) | `35` (`-crf 33`) | `45` (`-cq 28`) | `40` (`-cq 31`) | 极速导出与体积极小（VMAF 75~85），参数微调与遮罩边界排雷试跑 |
+
 > 参考：
 > - [`facefusion/ffmpeg_builder.py:set_video_quality()`](../../facefusion/ffmpeg_builder.py)
 > - [FFmpeg H.264 Video Encoding Guide](https://trac.ffmpeg.org/wiki/Encode/H.264)
 > - [FFmpeg H.265 Video Encoding Guide](https://trac.ffmpeg.org/wiki/Encode/H.265)
 > - [FFmpeg HWAccelIntro - NVENC](https://trac.ffmpeg.org/wiki/HWAccelIntro#NVENC)
 > - [Using FFmpeg with NVIDIA GPU Hardware Acceleration](https://docs.nvidia.com/video-technologies/video-codec-sdk/ffmpeg-with-nvidia-gpu/)
-
-主流编码器的推荐档位与底层参数映射如下（`hevc_nvenc` 基于 $64 \times 64$ 编码树单元（CTU，Coding Tree Unit）与样本自适应偏移（SAO，Sample Adaptive Offset）环路滤波，同画质所需质量档位低于 H.264；`h264_nvenc` 当 CQ 超过 `23` 时平坦肤色区易出现宏块色带）：
-
-| 画质档位 | `libx264` (CRF) | `libx265` (CRF) | `h264_nvenc` (CQ) | `hevc_nvenc` (CQ) | 典型适用场景 |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| 绝对无损 | `100` (`-crf 0`) | `100` (`-crf 0`) | - | - | 无损母版归档（体积庞大） |
-| 影视母带 | `80` (`-crf 10`) | `80` (`-crf 10`) | `80` (`-cq 10`) | `80` (`-cq 10`) | 特写镜头渲染、高码率商业交付 |
-| 视觉无损 | `65` (`-crf 18`) | `55` (`-crf 23`) | `60` (`-cq 20`) | `50` (`-cq 26`) | 肉眼难辨损耗，高质量成品导出首选 |
-| 标准均衡 | `55` (`-crf 23`) | `45` (`-crf 28`) | `50` (`-cq 26`) | `40` (`-cq 31`) | 画质与体积平衡，网络流媒体分发首选 |
-| 极速草稿 | `45` (`-crf 28`) | `35` (`-crf 33`) | `40` (`-cq 31`) | `30` (`-cq 36`) | 体积最小，调参预览与快速打样 |
 
 ### 输出视频预设 (Output Video Preset)
 
@@ -917,15 +917,13 @@ Choices: veryslow, slower, slow, medium, fast, faster, veryfast, superfast, ultr
 Default: veryfast
 ```
 
-编码速度与压缩率平衡预设。CPU 编码器（`libx264` / `libx265`）直接透传 9 档预设至 FFmpeg `-preset`；NVIDIA NVENC 硬件编码器（`h264_nvenc` / `hevc_nvenc`）底层仅提供 3 档硬件流水线预设，系统自动执行归并映射：
+编码速度与压缩率平衡预设。主流编码器的映射关系如下：
 
-| 预设档位 | 参数值 | CPU 编码器算法调度 (`libx264` / `libx265`) | NVENC 硬件映射 (`h264_nvenc` / `hevc_nvenc`) |
-| :--- | :--- | :--- | :--- |
-| 极限穷举 | `veryslow` | 全尺寸宏块率失真优化，速度极慢，边际收益微弱 | 归并映射为 `-preset slow`（高质量档） |
-| 深度压缩 | `slower`、`slow` | 深度多参考帧与自适应 B 帧决策，适合商业级交付 | 归并映射为 `-preset slow`（高质量档） |
-| 标准均衡 | `medium` | 全面宏块与运动搜索，压缩率与速度达到经典平衡 | 映射为 `-preset medium`（标准平衡档） |
-| 常规快速 | `fast`、`faster` | 启用基础运动估计与亚像素细化，速度与体积适中 | 归并映射为 `-preset fast`（极速草稿档） |
-| 极速草稿 | `veryfast` ~ `ultrafast` | 关闭大部分耗时搜索，编码耗时极短 | 归并映射为 `-preset fast`（极速草稿档） |
+| 预设档位 | 参数值 | CPU (`libx264` / `libx265`) | NVENC (`h264_nvenc` / `hevc_nvenc`) | 典型适用场景 |
+| :--- | :--- | :--- | :--- | :--- |
+| 高质压制 | `veryslow`、`slower`、`slow` | 直通传参，启用深度自适应 B 帧与多参考帧穷举搜索，压缩率最高 | 统一归并映射为 `-preset slow`（高质量硬件流水线，专用 ASIC 处理，极低 CUDA 算力占用） | 正式成片全片压制、商业交付与本地长期归档 |
+| 标准均衡 | `medium` | 直通传参，官方黄金基准平衡点 | 映射为 `-preset medium`（标准平衡硬件流水线） | 日常规整压制，编码耗时与体积取得经典折衷 |
+| 极速吞吐 | `fast` ~ `ultrafast` | 直通传参，关闭大部分耗时亚像素搜索与复杂上下文建模，耗时极短 | 统一归并映射为 `-preset fast`（高速硬件流水线） | 参数排雷打样与高吞吐批处理 |
 
 > 参考：
 > - [`facefusion/ffmpeg_builder.py:set_video_preset()`](../../facefusion/ffmpeg_builder.py)
