@@ -6,3 +6,4 @@
 
 - [安装指南](document/installation.md)。
 - [调参指南](document/tuning.md)。
+- [预设指南](document/preset.md)。
