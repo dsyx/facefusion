@@ -883,7 +883,7 @@ UI: OUTPUT VIDEO QUALITY | CLI: --output-video-quality | INI: [output_creation] 
 Range: 0 - 100
 Step: 1
 Default: 80
-Note: For NVENC, avoid setting quality to 100 (-cq 0 disables constant quality and falls back to low-bitrate VBR); use 99 for maximum quality
+Note: Avoid setting quality to 100. In libx264, 100 activates mathematically lossless mode with huge file sizes; in NVENC, 100 (-cq 0) disables constant quality and falls back to low-bitrate VBR; use visually lossless ranges (65-67 or 99) for maximum quality
 ```
 
 系统将输入的质量数值 $q$ 线性反向换算为底层编码器的量化与速率控制参数：
@@ -892,15 +892,14 @@ Note: For NVENC, avoid setting quality to 100 (-cq 0 disables constant quality a
 
 $$\text{CRF / CQ} = \text{round}\left(51 \times \left(1 - \frac{q}{100}\right)\right)$$
 
-主流编码器的推荐档位、底层参数映射及基于 Netflix 视频多方法评估融合（VMAF，Video Multi-Method Assessment Fusion）算法的感知画质得分如下：
+主流编码器的推荐区间档位、底层参数映射及基于 Netflix 视频多方法评估融合（VMAF，Video Multi-Method Assessment Fusion）算法的感知画质得分如下：
 
-| 画质档位 | `libx264` (CRF) | `libx265` (CRF) | `h264_nvenc` (CQ) | `hevc_nvenc` (CQ) | 典型适用场景与 VMAF 表现 |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| 数学无损 | `100` (`-crf 0`) | `100` (`-crf 0`) | - | - | 无损母版归档与中间无损渲染，体积庞大（VMAF 100） |
-| 视觉无损 | `65` (`-crf 18`) | `60` (`-crf 20`) | `65` (`-cq 18`) | `60` (`-cq 20`) | 达人眼感知透明门槛（VMAF ≥ 96），微观特写大片首选 |
-| 高质成片 | `60` (`-crf 20`) | `55` (`-crf 23`) | `60` (`-cq 20`) | `55` (`-cq 23`) | 甜点画质（VMAF 93~95），体积较视觉无损锐减约 35%，正式成片导出首选 |
-| 标准均衡 | `55` (`-crf 23`) | `45` (`-crf 28`) | `55` (`-cq 23`) | `50` (`-cq 26`) | 官方基准平衡线（VMAF 86~92），网络流媒体分发与常规分享 |
-| 排雷草稿 | `45` (`-crf 28`) | `35` (`-crf 33`) | `45` (`-cq 28`) | `40` (`-cq 31`) | 极速导出与体积极小（VMAF 75~85），参数微调与遮罩边界排雷试跑 |
+| 画质档位 | VMAF | `libx264` (CRF) | `libx265` (CRF) | `h264_nvenc` (CQ) | `hevc_nvenc` (CQ) | 典型适用场景 |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| 视觉无损 | 94 ~ 97 | 65 ~ 67 (`-crf 17~18`) | 57 ~ 60 (`-crf 20~22`) | 65 ~ 67 (`-cq 17~19`) | 57 ~ 60 (`-cq 20~22`) | 达人眼感知透明门槛，微观特写大片首选 |
+| 高清优质 | 89 ~ 93 | 55 ~ 60 (`-crf 20~23`) | 50 ~ 55 (`-crf 23~26`) | 55 ~ 60 (`-cq 20~23`) | 50 ~ 55 (`-cq 23~26`) | 细节保留完整无可见伪影，体积锐减约 35%，正式成片导出首选 |
+| 标准均衡 | 82 ~ 88 | 50 ~ 55 (`-crf 23~26`) | 45 ~ 50 (`-crf 26~28`) | 48 ~ 53 (`-cq 24~27`) | 44 ~ 49 (`-cq 26~29`) | 手机小屏观感良好，大屏暗场微观细节轻微丢失，适合网络快速分享 |
+| 排雷草稿 | 70 ~ 81 | 40 ~ 45 (`-crf 28~31`) | 30 ~ 35 (`-crf 33~36`) | 40 ~ 45 (`-cq 28~31`) | 30 ~ 35 (`-cq 33~36`) | 极速导出与体积极小，出现可见涂抹，适合参数微调排雷试跑 |
 
 > 参考：
 > - [`facefusion/ffmpeg_builder.py:set_video_quality()`](../../facefusion/ffmpeg_builder.py)
