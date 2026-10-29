@@ -596,12 +596,12 @@ Default: gfpgan_1.4
 
 盲人脸修复（BFR，Blind Face Restoration）模型在学术界标准基准评测中，常采用合成测试集 CelebA-Test 的学习感知图像块相似度（LPIPS，Learned Perceptual Image Patch Similarity）、身份特征相似度（IDS，Identity Score）或身份特征距离（IDD，Identity Distance）及三大真实退化测试集 LFW-Test（轻度退化）、WebPhoto-Test（网络压缩退化）、Wider-Test（重度模糊退化）的 FID 衡量修复表现：
 
-| 模型 | 核心先验架构 | CelebA-Test<br/>(LPIPS ($\downarrow$) / IDS ($\uparrow$)) | 真实退化集 FID ($\downarrow$)<br/>(LFW / WebPhoto / Wider) | 适用场景 |
+| 模型 | 核心先验架构 | CelebA-Test<br/>(LPIPS ($\downarrow$) / 身份保持指标) | 真实退化集 FID ($\downarrow$)<br/>(LFW / WebPhoto / Wider) | 适用场景 |
 | :--- | :--- | :--- | :--- | :--- |
-| `codeformer` | 离散矢量量化码本（Vector Quantized Codebook）+ Transformer 全局上下文查表 | **0.299 / 0.60** | 52.02 / 78.87 / **39.06** | 重度模糊与低清修复首选；五官线条锐利，支持连续调节生成细节与原貌保真度权重 |
-| `gfpgan_1.2`<br/>`gfpgan_1.3`<br/>`gfpgan_1.4` | 预训练 StyleGAN2 生成面部先验（GFP，Generative Facial Prior）+ 通道分割空间特征变换（CS-SFT，Channel-Split Spatial Feature Transform） | 0.391 / 0.42 | 49.96 / 87.35 / 40.59 | `1.2 → 1.4` 逐步修正眼齿伪影；推理速度快、肤色平滑讨喜，适合常规清晰度视频打底（首选 `1.4`） |
-| `gpen_bfr_256`<br/>`gpen_bfr_512`<br/>`gpen_bfr_1024`<br/>`gpen_bfr_2048` | 将 StyleGAN 生成器块直接嵌入 U-Net 编码-解码器，支持多尺度原生训练 | 0.349 / 0.54 | 57.58 / 81.77 / 46.99 | 高分辨率档位在 4K 大特写镜头中重建的毛孔微纹理最细腻，但显存与耗时随尺寸成倍增加 |
-| `restoreformer_plus_plus` | 重构导向多头交叉注意力（Reconstruction-Oriented Multi-Head Cross-Attention）+ 扩展退化模型（EDM，Extended Degradation Model），多尺度融合退化特征与高清字典先验 | 0.344 / - <br/>(IDD 29.63°) | **48.48 / 74.21** / 40.86 | 相比传统 GAN 模型不易产生塑胶涂抹感或改变换脸后的五官神态，真实中轻度与网络退化集 FID 最优，适合高保真影视精修 |
+| `codeformer` | 离散矢量量化码本（Vector Quantized Codebook）+ Transformer 全局上下文查表 | **0.299 / 0.60** (IDS $\uparrow$) | 52.02 / 78.87 / **39.06** | 重度模糊与低清修复首选；五官线条锐利，支持连续调节生成细节与原貌保真度权重 |
+| `gfpgan_1.2`<br/>`gfpgan_1.3`<br/>`gfpgan_1.4` | 预训练 StyleGAN2 生成面部先验（GFP，Generative Facial Prior）+ 通道分割空间特征变换（CS-SFT，Channel-Split Spatial Feature Transform） | 0.365 / 0.42 (IDS $\uparrow$) | 49.96 / 87.35 / 40.59 | `1.2 → 1.4` 逐步修正眼齿伪影；推理速度快、肤色平滑讨喜，适合常规清晰度视频打底（首选 `1.4`） |
+| `gpen_bfr_256`<br/>`gpen_bfr_512`<br/>`gpen_bfr_1024`<br/>`gpen_bfr_2048` | 将 StyleGAN 生成器块直接嵌入 U-Net 编码-解码器，支持多尺度原生训练 | 0.349 / 0.54 (IDS $\uparrow$) | 57.58 / 81.77 / 46.99 | 高分辨率档位在 4K 大特写镜头中重建的毛孔微纹理最细腻，但显存与耗时随尺寸成倍增加 |
+| `restoreformer_plus_plus` | 重构导向多头交叉注意力（Reconstruction-Oriented Multi-Head Cross-Attention）+ 扩展退化模型（EDM，Extended Degradation Model），多尺度融合退化特征与高清字典先验 | 0.344 / **29.63°** (IDD $\downarrow$) | **48.48 / 74.21** / 40.86 | 相比传统 GAN 模型不易产生塑胶涂抹感或改变换脸后的五官神态，真实中轻度与网络退化集 FID 最优，适合高保真影视精修 |
 
 > 参考：
 > - [`facefusion/processors/modules/face_enhancer/core.py:create_static_model_set()`](../../facefusion/processors/modules/face_enhancer/core.py)
@@ -892,7 +892,7 @@ Note: For NVENC, avoid setting quality to 100 (-cq 0 disables constant quality a
 
 $$\text{CRF / CQ} = \text{round}\left(51 \times \left(1 - \frac{q}{100}\right)\right)$$
 
-主流编码器的推荐档位与底层参数映射如下：
+主流编码器的推荐档位、底层参数映射及基于 Netflix 视频多方法评估融合（VMAF，Video Multi-Method Assessment Fusion）算法的感知画质得分如下：
 
 | 画质档位 | `libx264` (CRF) | `libx265` (CRF) | `h264_nvenc` (CQ) | `hevc_nvenc` (CQ) | 典型适用场景与 VMAF 表现 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -917,11 +917,11 @@ Choices: veryslow, slower, slow, medium, fast, faster, veryfast, superfast, ultr
 Default: veryfast
 ```
 
-编码速度与压缩率平衡预设。主流编码器的映射关系如下：
+编码速度与压缩率权衡预设。在 CPU 软编码器（`libx264` / `libx265`）下直接透传预设名称；在基于专用集成电路（ASIC，Application-Specific Integrated Circuit）的 NVIDIA GPU 硬件编码器（`h264_nvenc` / `hevc_nvenc`）下，底层通过 `map_nvenc_preset()` 将 9 档预设归并映射为 `fast`、`medium`、`slow` 三档硬件流水线：
 
 | 预设档位 | 参数值 | CPU (`libx264` / `libx265`) | NVENC (`h264_nvenc` / `hevc_nvenc`) | 典型适用场景 |
 | :--- | :--- | :--- | :--- | :--- |
-| 高质压制 | `veryslow`、`slower`、`slow` | 直通传参，启用深度自适应 B 帧与多参考帧穷举搜索，压缩率最高 | 统一归并映射为 `-preset slow`（高质量硬件流水线，专用 ASIC 处理，极低 CUDA 算力占用） | 正式成片全片压制、商业交付与本地长期归档 |
+| 高质压制 | `veryslow`、`slower`、`slow` | 直通传参，启用深度自适应 B 帧与多参考帧穷举搜索，压缩率最高 | 统一归并映射为 `-preset slow`（高质量硬件流水线，独立 ASIC 单元处理，极低 CUDA 算力占用） | 正式成片全片压制、商业交付与本地长期归档 |
 | 标准均衡 | `medium` | 直通传参，官方黄金基准平衡点 | 映射为 `-preset medium`（标准平衡硬件流水线） | 日常规整压制，编码耗时与体积取得经典折衷 |
 | 极速吞吐 | `fast` ~ `ultrafast` | 直通传参，关闭大部分耗时亚像素搜索与复杂上下文建模，耗时极短 | 统一归并映射为 `-preset fast`（高速硬件流水线） | 参数排雷打样与高吞吐批处理 |
 
