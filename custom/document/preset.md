@@ -36,8 +36,8 @@ FaceFusion 的配置解析器采用空值回退机制：`.ini` 文件中未声�
 | 预设文件 | 定位与核心诉求 | 适用工作流阶段 | 关键参数选型 (`detector` / `landmarker` / `swapper` / `occluder` / `processors` / `quality`) |
 | :--- | :--- | :--- | :--- |
 | [`image.ini`](../preset/image.ini) | **静态写真与大特写精修**<br/>（极致纹理、不计单帧耗时） | 静态封面、海报精修、高分辨率单张写真人像（`image-to-image`） | `retinaface` / `[2dfan4]` / `hyperswap_1c_256` (`1024x1024`, weight `0.6`) / `xseg_2` / `swapper + enhancer(restoreformer++)` / 图像质量 `95` |
-| [`video_draft.ini`](../preset/video_draft.ini) | **视频打样与极速排雷**<br/>（秒级吞吐、极小体积） | 调参试跑、多源图排雷验证、遮罩边界检查、对口型预览 | `[yolo_face]` / `[2dfan4]` / `[hyperswap_1a_256]` (`512x512`) / `xseg_2` / 单 `swapper`（无后处理） / `hevc_nvenc` (质量 `30`, `-cq 36`) |
-| [`video.ini`](../preset/video.ini) | **视频正式成片交付**<br/>（鲁棒超集、原生胶片质感） | 正式成片全片压制、包含转头甩发与遮挡的复杂动态视频 | `retinaface` (0.4) / `hrffa` / `[hyperswap_1a_256]` (`512x512`) / 追踪 (`0.25`) / `xseg_2` / 单 `swapper`（杜绝闪烁） / `hevc_nvenc` (质量 `50`, `-cq 26`) |
+| [`video_draft.ini`](../preset/video_draft.ini) | **视频打样与极速排雷**<br/>（秒级吞吐、极小体积） | 调参试跑、多源图排雷验证、遮罩边界检查、对口型预览 | `[yolo_face]` / `[2dfan4]` / `[hyperswap_1a_256]` (`512x512`) / `xseg_2` / 单 `swapper`（无后处理） / `hevc_nvenc` (质量 `40`, `-cq 31`) |
+| [`video.ini`](../preset/video.ini) | **视频正式成片交付**<br/>（鲁棒超集、原生胶片质感） | 正式成片全片压制、包含转头甩发与遮挡的复杂动态视频 | `retinaface` (0.4) / `hrffa` / `[hyperswap_1a_256]` (`512x512`) / 追踪 (`0.25`) / `xseg_2` / 单 `swapper`（杜绝闪烁） / `hevc_nvenc` (质量 `55`, `-cq 23`) |
 
 > 注：表中方括号 `[...]` 表示未显式覆写、直接沿用系统官方默认值。
 
@@ -116,8 +116,8 @@ uv run python facefusion.py headless-run `
   --face-swapper-pixel-boost 512x512 `
   --output-audio-encoder aac `
   --output-video-encoder hevc_nvenc `
-  --output-video-preset slow `
-  --output-video-quality 30 `
+  --output-video-preset veryfast `
+  --output-video-quality 40 `
   --execution-thread-count 12 `
   --video-memory-strategy tolerant
 ```
@@ -126,7 +126,7 @@ uv run python facefusion.py headless-run `
 - **单模块极速流水线**：`processors` 保持官方默认单 `face_swapper`，完全不挂载耗时的面部超分与后处理模型，推理吞吐最大化。
 - **轻量检测与零帧分发开销**：检测（`yolo_face`）、对齐（`2dfan4`）、换脸（`hyperswap_1a_256`）全走系统内置轻量默认值；显式指定 `--target-frame-amount 0` 消除未开追踪时的冗余帧读取开销。
 - **黄金甜点位尺寸**：采用 `512x512`（$2 \times 2 = 4$ 子视图），前向推理次数比 768 少 2.25 倍，且足以清晰呈现五官对齐与遮罩贴合情况。
-- **极速小体积编码**：采用 `hevc_nvenc` 搭配 `--output-video-quality 30`（精准对应硬件 `-cq 36`），文件体积极小、导出极快，便于快速拖动时间轴检查。
+- **极速小体积编码**：采用 `hevc_nvenc` 搭配 `--output-video-preset veryfast`（映射为硬件 `-preset fast` 高速流水线）与 `--output-video-quality 40`（精准对应硬件 `-cq 31`，VMAF 75~85），文件体积极小、导出极快，便于快速拖动时间轴检查。
 
 ### 视频正式成片交付
 
@@ -150,7 +150,7 @@ uv run python facefusion.py headless-run `
   --output-audio-encoder aac `
   --output-video-encoder hevc_nvenc `
   --output-video-preset slow `
-  --output-video-quality 50 `
+  --output-video-quality 55 `
   --execution-thread-count 12 `
   --video-memory-strategy tolerant
 ```
@@ -159,7 +159,7 @@ uv run python facefusion.py headless-run `
 - **鲁棒感知超集防闪回**：选用密集金字塔架构的 `retinaface`（阈值下调至 `0.4`）与极端偏航俯仰稳健的 `hrffa`，配合 `--face-tracker-score 0.25`（默认窗口 2），彻底杜绝转头甩发时因单帧漏检而闪回原脸。
 - **默认 1a 姿态稳定**：换脸模型沿用内置的 `hyperswap_1a_256`，同系列中姿态与表情误差最低，抗极端大角度变形最稳。
 - **坚决剔除超分，杜绝时序闪烁**：不挂载 `face_enhancer`。GAN 超分是逐帧独立推理，在视频中会不可避免地导致睫毛、胡渣、毛孔在帧间产生微小的高频蠕动与闪烁（Jitter），且容易抹平原生美感；依托 `512x512` 原生直出能够完美保留真实皮肤肌理与胶片颗粒。
-- **心理视觉绝对无损**：采用 `hevc_nvenc` 搭配 `--output-video-quality 50`（精准对应硬件 `-cq 26`）。在 HEVC 编码下，`-cq 26` 是公认的视觉无损上限，既彻底消除了平坦肤色区色带，又杜绝了虚高 CQ 带来的码率暴增。
+- **高质成片甜点位编码**：采用 `hevc_nvenc` 搭配 `--output-video-preset slow` 与 `--output-video-quality 55`（精准对应硬件 `-cq 23`）。在 HEVC 编码下，`-cq 23` 对应 VMAF 93~95 甜点画质，体积较视觉无损锐减约 35%，彻底杜绝平坦肤色区色带，是工业级正式成片导出的首选基线。
 
 ## 跨场景正交微调维度
 
@@ -221,5 +221,5 @@ uv run python facefusion.py headless-run `
 | 手指、刘海、话筒或水杯被换脸纹理覆盖穿模 | 未开启遮挡遮罩，或单模型对指缝/细发丝分割不充分 | 确保设置 `--face-mask-types box occlusion`；将 `--face-occluder-model` 切换为 `xseg_2` 或三模交集 `many` |
 | 眼镜框被模糊抹平或半截消失 | 换脸区域覆盖了原生眼镜，且遮挡模型未能将其识别为障碍物 | 设置 `--face-mask-types box occlusion region`，并在 `--face-mask-regions` 中剔除 `glasses` |
 | 脸颊四周出现明显方框接缝或肤色断层 | 遮罩羽化宽度不足，或裁切边界存在边缘推理伪影 | 调大 `--face-mask-blur` 至 `0.35` ~ `0.45`；设置 `--face-mask-padding 3 3 3 3` 内缩裁除边界 |
-| 平坦肤色区出现阶梯状色带或马赛克宏块 | 编码器未启用现代量化控制，或码率不足 | 确保设置 `--output-video-encoder hevc_nvenc`，将 `--output-video-quality` 设为 `50`（`-cq 26` 视觉无损），保持 `--output-video-preset slow` |
+| 平坦肤色区出现阶梯状色带或马赛克宏块 | 编码器未启用现代量化控制，或码率不足 | 确保设置 `--output-video-encoder hevc_nvenc`，将 `--output-video-quality` 设为 `55`（`-cq 23` 高质成片），保持 `--output-video-preset slow` |
 | 跨性别换脸时全片完全不换脸 | 误启用了 `--face-selector-gender auto`，目标与源性别不一致导致目标人脸被全局过滤 | **彻底移除 `--face-selector-gender`**，保持系统默认无性别过滤状态 |
