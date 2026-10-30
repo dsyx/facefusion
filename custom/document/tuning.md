@@ -218,11 +218,11 @@ $$M = \begin{bmatrix} \cos\theta & \sin\theta & (1 - \cos\theta)c_x - \sin\theta
 
 $$\begin{bmatrix} x \\ y \end{bmatrix} = M_{\text{inv}} \begin{bmatrix} x_\theta \\ y_\theta \\ 1 \end{bmatrix}$$
 
+每增加一个检测角度，系统均需执行一次独立的图像旋转与模型前向推理，检测阶段耗时呈线性倍数增加。常规正向视频建议仅保留默认值 `0`，仅在存在大幅侧翻、躺卧等极端镜头时按需开启特定角度。
+
 > 参考：
 > - [`facefusion/face_helper.py:create_rotation_matrix_and_size()`](../../facefusion/face_helper.py)
 > - [`facefusion/face_detector.py:detect_faces_by_angle()`](../../facefusion/face_detector.py)
-
-每增加一个检测角度，检测阶段耗时成倍增加。
 
 ### 人脸检测外边距 (Face Detector Margin)
 
@@ -406,12 +406,12 @@ Default: 0.3
 
 $$d_{\text{norm}} = \frac{1 - \hat{e}_{\text{target}} \cdot \hat{e}_{\text{ref}}}{2}$$
 
-> 参考：
-> - [`facefusion/face_selector.py:compare_faces()`](../../facefusion/face_selector.py)
-
 当 $d_{\text{norm}} < \theta_{\text{ref}}$（即设定的匹配阈值）时判定为同一人。
 - 调大（如 `0.35` ~ `0.45`）：放宽判定条件，解决主角转头、光影突变时断连漏换；但过大可能误将他人识别为目标。
 - 调小（如 `0.20` ~ `0.25`）：严苛匹配，杜绝认错人；但在侧脸或大表情时可能漏检。
+
+> 参考：
+> - [`facefusion/face_selector.py:compare_faces()`](../../facefusion/face_selector.py)
 
 ### 人脸追踪重合度 (Face Tracker Score)
 
@@ -532,12 +532,12 @@ Note: Only applies to embedding-based swap models; has no effect on blendswap or
 
 $$\vec{e}_{\text{mixed}} = (1 - \alpha)\vec{e}_{\text{source}} + \alpha\vec{e}_{\text{target}}$$
 
-> 参考：
-> - [`facefusion/processors/modules/face_swapper/core.py:balance_source_embedding()`](../../facefusion/processors/modules/face_swapper/core.py)
-
 - 调小（`0.0` ~ `0.3`）：$\alpha > 0$。当 $w = 0.0$ 时达到边界 $\alpha = 0.35$（保留 $65\%$ 源人脸特征，融入 $35\%$ 目标人脸特征），使五官结构更自然贴合目标人物的面部轮廓。
 - 居中（`0.5`）：$\alpha = 0$。$\vec{e}_{\text{mixed}} = \vec{e}_{\text{source}}$，纯粹采用源人脸特征向量，不混入任何目标特征。
 - 调大（`0.7` ~ `1.0`）：$\alpha < 0$。系统执行仿射外推；当 $w = 1.0$ 时达到极值 $\alpha = -0.35$（叠加 $135\%$ 源特征并反向扣除 $35\%$ 目标特征），以反向对比形式极度强化源人脸辨识度（但可能放大局部光影噪点）。
+
+> 参考：
+> - [`facefusion/processors/modules/face_swapper/core.py:balance_source_embedding()`](../../facefusion/processors/modules/face_swapper/core.py)
 
 ### 表情还原 (Expression Restorer)
 
@@ -568,11 +568,11 @@ Default: 80
 
 $$E_{\text{out}} = \frac{1.2f}{100} E_{\text{target}} + \left(1 - \frac{1.2f}{100}\right) E_{\text{temp}}$$
 
+设为 `80`（对应系数 $0.96$）能自然复原目标人物眨眼、扬眉、大笑时的五官形变，消除面部僵硬感；调大至 `100` 产生超额超调补偿（$1.2$ 倍），适合夸张喜剧表情。
+
 > 参考：
 > - [`facefusion/processors/modules/expression_restorer/core.py:apply_restore()`](../../facefusion/processors/modules/expression_restorer/core.py)
 > - [`facefusion/processors/modules/expression_restorer/core.py:restore_expression()`](../../facefusion/processors/modules/expression_restorer/core.py)
-
-设为 `80`（对应系数 $0.96$）能自然复原目标人物眨眼、扬眉、大笑时的五官形变，消除面部僵硬感；调大至 `100` 产生超额超调补偿（$1.2$ 倍），适合夸张喜剧表情。
 
 #### 表情还原部位 (Expression Restorer Areas)
 
@@ -623,10 +623,10 @@ Default: 80
 
 $$I_{\text{out}} = \left(1 - \frac{\text{blend}}{100}\right) I_{\text{raw}} + \frac{\text{blend}}{100} I_{\text{enhanced}}$$
 
+推荐设置为 `60` ~ `80`，透出原图部分自然噪点，避免过度平滑导致的涂抹感与皮肤纹理丢失。
+
 > 参考：
 > - [`facefusion/processors/modules/face_enhancer/core.py:blend_paste_frame()`](../../facefusion/processors/modules/face_enhancer/core.py)
-
-推荐设置为 `60` ~ `80`，透出原图部分自然噪点，避免过度平滑导致的涂抹感与皮肤纹理丢失。
 
 #### 人脸增强权重 (Face Enhancer Weight)
 
@@ -896,10 +896,10 @@ $$\text{CRF / CQ} = \text{round}\left(51 \times \left(1 - \frac{q}{100}\right)\r
 
 | 画质档位 | VMAF | `libx264` (CRF) | `libx265` (CRF) | `h264_nvenc` (CQ) | `hevc_nvenc` (CQ) | 典型适用场景 |
 | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| 视觉无损 | 94 ~ 97 | 65 ~ 67 (`-crf 17~18`) | 57 ~ 60 (`-crf 20~22`) | 65 ~ 67 (`-cq 17~18`) | 57 ~ 60 (`-cq 20~22`) | 达人眼感知透明门槛，微观特写大片首选 |
-| 高清优质 | 89 ~ 93 | 55 ~ 60 (`-crf 20~23`) | 50 ~ 55 (`-crf 23~26`) | 55 ~ 60 (`-cq 20~23`) | 50 ~ 55 (`-cq 23~26`) | 细节保留完整无可见伪影，体积锐减约 35%，正式成片导出首选 |
-| 标准均衡 | 82 ~ 88 | 50 ~ 55 (`-crf 23~26`) | 45 ~ 50 (`-crf 26~28`) | 50 ~ 55 (`-cq 23~26`) | 45 ~ 50 (`-cq 26~28`) | 手机小屏观感良好，大屏暗场微观细节轻微丢失，适合网络快速分享 |
-| 排雷草稿 | 70 ~ 81 | 40 ~ 45 (`-crf 28~31`) | 30 ~ 35 (`-crf 33~36`) | 40 ~ 45 (`-cq 28~31`) | 30 ~ 35 (`-cq 33~36`) | 极速导出与体积极小，出现可见涂抹，适合参数微调排雷试跑 |
+| 视觉无损 | 94 ~ 97 | 65 ~ 67<br/>(`-crf 18 → 17`) | 57 ~ 60<br/>(`-crf 22 → 20`) | 65 ~ 67<br/>(`-cq 18 → 17`) | 57 ~ 60<br/>(`-cq 22 → 20`) | 达人眼感知透明门槛，微观特写大片首选 |
+| 高清优质 | 89 ~ 93 | 55 ~ 60<br/>(`-crf 23 → 20`) | 50 ~ 55<br/>(`-crf 26 → 23`) | 55 ~ 60<br/>(`-cq 23 → 20`) | 50 ~ 55<br/>(`-cq 26 → 23`) | 细节保留完整无可见伪影，体积锐减约 35%，正式成片导出首选 |
+| 标准均衡 | 82 ~ 88 | 50 ~ 55<br/>(`-crf 26 → 23`) | 45 ~ 50<br/>(`-crf 28 → 26`) | 50 ~ 55<br/>(`-cq 26 → 23`) | 45 ~ 50<br/>(`-cq 28 → 26`) | 手机小屏观感良好，大屏暗场微观细节轻微丢失，适合网络快速分享 |
+| 排雷草稿 | 70 ~ 81 | 40 ~ 45<br/>(`-crf 31 → 28`) | 30 ~ 35<br/>(`-crf 36 → 33`) | 40 ~ 45<br/>(`-cq 31 → 28`) | 30 ~ 35<br/>(`-cq 36 → 33`) | 极速导出与体积极小，出现可见涂抹，适合参数微调排雷试跑 |
 
 > 参考：
 > - [`facefusion/ffmpeg_builder.py:set_video_quality()`](../../facefusion/ffmpeg_builder.py)

@@ -35,7 +35,7 @@ FaceFusion 配置解析器采用空值回退机制：`.ini` 文件或命令行�
 | 预设文件 | 定位与诉求 | 适用阶段 | 核心参数 (`detector` / `landmarker` / `swapper` / `occluder` / `processors` / `quality`) |
 | :--- | :--- | :--- | :--- |
 | [`image.ini`](../preset/image.ini) | 静态写真精修（画质优先） | 静态封面、海报、单张写真精修 | `retinaface` / `[2dfan4]` / `hyperswap_1c_256` (`1024x1024`, weight `0.6`) / `xseg_2` / `swapper + enhancer(restoreformer++)` / 图像质量 `95` |
-| [`video_draft.ini`](../preset/video_draft.ini) | 视频打样排雷（吞吐优先） | 试跑调参、选图对比、遮罩边界检查 | `[yolo_face]` / `[2dfan4]` / `hyperswap_1a_256` (`512x512`) / `xseg_2` / 单 `swapper` / `hevc_nvenc` (`veryfast`, 质量 `40`, `-cq 31`) |
+| [`video_draft.ini`](../preset/video_draft.ini) | 视频打样排雷（吞吐优先） | 试跑调参、选图对比、遮罩边界检查 | `[yolo_face]` / `[2dfan4]` / `hyperswap_1a_256` (`512x512`) / `xseg_2` / 单 `swapper` / `hevc_nvenc` (`veryfast`, 质量 `35`, `-cq 33`) |
 | [`video.ini`](../preset/video.ini) | 视频正式成片（鲁棒保真） | 正式成片全片压制、复杂动态镜头 | `retinaface` (0.4) / `hrffa` / `hyperswap_1a_256` (`512x512`) / 追踪 (`0.25`) / `xseg_2` / 单 `swapper` / `hevc_nvenc` (`slow`, 质量 `55`, `-cq 23`) |
 
 > 注：方括号 `[...]` 表示沿用系统默认值。
@@ -119,7 +119,7 @@ uv run python facefusion.py headless-run `
   --output-audio-encoder aac `
   --output-video-encoder hevc_nvenc `
   --output-video-preset veryfast `
-  --output-video-quality 40 `
+  --output-video-quality 35 `
   --execution-thread-count 12 `
   --video-memory-strategy tolerant
 ```
@@ -128,7 +128,7 @@ uv run python facefusion.py headless-run `
 - 单换脸管线：仅运行单模块 `face_swapper`，跳过面部超分与后处理模型，最大化推理吞吐。
 - 轻量检测与零帧分发：采用默认检测器 `yolo_face` 与关键点 `2dfan4`；显式设 `--target-frame-amount 0` 消除相邻帧解码开销。
 - 尺寸甜点位：选用 `512x512`（4 个子视图），推理量仅为 768 的 44%，足以清晰检视五官贴合度与遮罩边界。
-- 高速轻量编码：采用 `hevc_nvenc` 搭配 `veryfast`（映射为硬件 `-preset fast` 高速流水线）与质量 40（对应 `-cq 31`，VMAF 75~85），文件体积极小且导出迅速。
+- 高速轻量编码：采用 `hevc_nvenc` 搭配 `veryfast`（映射为硬件 `-preset fast` 高速流水线）与质量 35（对应 `-cq 33`，VMAF 70~81），文件体积极小且导出迅速。
 
 ### 视频正式成片
 
@@ -163,7 +163,7 @@ uv run python facefusion.py headless-run `
 - 鲁棒感知超集：采用密集金字塔架构的 `retinaface`（阈值下调至 0.4）与抗极端欧拉角的 `hrffa`，配合时序追踪（阈值 0.25，窗口 2），杜绝甩头转场瞬间因单帧漏检闪回原脸。
 - 姿态稳定性：选用 `hyperswap_1a_256`，在同系列中姿态与表情误差最低，抗大角度畸变能力最强。
 - 杜绝时序抖动：不启用 `face_enhancer`。GAN 超分逐帧独立推理会导致高频细节（睫毛、胡渣、毛孔）帧间闪烁蠕动；依托 `512x512` 直出保留真实胶片质感。
-- 成片编码甜点位：采用 `hevc_nvenc` 搭配 `slow`（高质量硬件流水线）与质量 55（对应 `-cq 23`，VMAF 93~95），体积较视觉无损锐减约 35%，彻底消除平坦肤色区色带。
+- 成片编码甜点位：采用 `hevc_nvenc` 搭配 `slow`（高质量硬件流水线）与质量 55（对应 `-cq 23`，VMAF 89~93），体积较视觉无损锐减约 35%，彻底消除平坦肤色区色带。
 
 ## 跨场景正交微调维度
 
