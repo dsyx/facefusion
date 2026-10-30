@@ -90,7 +90,6 @@ uv run python facefusion.py headless-run `
   --face-mask-types box occlusion `
   --face-occluder-model xseg_2 `
   --face-mask-blur 0.35 `
-  --face-mask-padding 3 3 3 3 `
   --processors face_swapper face_enhancer `
   --face-enhancer-model restoreformer_plus_plus `
   --face-enhancer-blend 40 `
@@ -218,6 +217,6 @@ uv run python facefusion.py headless-run `
 | 大笑或微表情显得僵硬粘连 | 换脸特征向量平抑了原视频大幅度表情形变 | 追加 `--processors face_swapper expression_restorer`（默认 factor 80 提供 0.96 倍高保真形变复原，避免超调撕裂） |
 | 手指、刘海、话筒被换脸覆盖穿模 | 未开启遮挡遮罩或单模型对指缝发丝分割不充分 | 设置 `--face-mask-types box occlusion`，切换 `--face-occluder-model xseg_2` 或 `many` |
 | 眼镜框被模糊抹平或半截消失 | 换脸区域覆盖了原生眼镜 | 设置 `--face-mask-types box occlusion region`，在 `--face-mask-regions` 中剔除 `glasses` |
-| 脸颊四周出现明显接缝或色温断层 | 羽化宽度不足或裁切边缘存在伪影 | 调大 `--face-mask-blur` 至 0.35 ~ 0.45，设置 `--face-mask-padding 3 3 3 3` |
+| 脸颊四周出现明显接缝或色温断层 | 羽化宽度不足或裁切边缘存在伪影 | 调大 `--face-mask-blur` 至 0.35 ~ 0.45 |
 | 平坦肤色区出现阶梯状色带 | 编码器未启用现代量化控制或码率不足 | 设置 `--output-video-encoder hevc_nvenc`，`--output-video-quality 55`，`--output-video-preset slow` |
 | 跨性别换脸全片不换脸 | 启用了 `--face-selector-gender auto` 导致目标人脸被过滤 | 移除 `--face-selector-gender`，保持默认无过滤 |
