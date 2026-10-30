@@ -54,12 +54,21 @@ uv run python facefusion.py headless-run `
   -t custom/target/video.mp4 `
   -o custom/output/video.mp4
 
-# Run batch with video preset
+# Run batch with video preset (Cartesian product)
 uv run python facefusion.py batch-run `
   --config-path custom/preset/video.ini `
   -s "custom/source/*.png" `
   -t "custom/target/*.mp4" `
-  -o "custom/output/{target_name}.{target_extension}"
+  -o "custom/output/{target_name}_{source_name}.{target_extension}"
+
+# Run multi-source fusion batch with video preset
+Get-ChildItem "custom/target/*.mp4" | ForEach-Object {
+  uv run python facefusion.py headless-run `
+    --config-path custom/preset/video.ini `
+    -s (Get-ChildItem "custom/source/source_*.png").FullName `
+    -t $_.FullName `
+    -o "custom/output/$($_.Name)"
+}
 ```
 
 ## 预设详解与选型依据
