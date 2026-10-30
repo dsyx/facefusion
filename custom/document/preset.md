@@ -34,7 +34,7 @@ FaceFusion 配置解析器采用空值回退机制：`.ini` 文件或命令行�
 
 | 预设文件 | 定位与诉求 | 适用阶段 | 核心参数 (`detector` / `landmarker` / `swapper` / `occluder` / `processors` / `quality`) |
 | :--- | :--- | :--- | :--- |
-| [`image.ini`](../preset/image.ini) | 静态写真精修（画质优先） | 静态封面、海报、单张写真精修 | `retinaface` / `[2dfan4]` / `hyperswap_1c_256` (`1024x1024`, weight `0.6`) / `xseg_2` / `swapper + enhancer(restoreformer++, blend 40)` / `[无损 PNG]` |
+| [`image.ini`](../preset/image.ini) | 静态写真精修（画质优先） | 静态封面、海报、单张写真精修 | `retinaface` / `[2dfan4]` / `hyperswap_1c_256` (`1024x1024`) / `xseg_2` / 单 `swapper` / `[无损 PNG]` |
 | [`video_draft.ini`](../preset/video_draft.ini) | 视频打样排雷（吞吐优先） | 试跑调参、选图对比、遮罩边界检查 | `[yolo_face]` / `[2dfan4]` / `hyperswap_1a_256` (`512x512`) / `xseg_2` / 单 `swapper` / `hevc_nvenc` (`[veryfast]`, 质量 `35`, `-cq 33`) |
 | [`video.ini`](../preset/video.ini) | 视频正式成片（鲁棒保真） | 正式成片全片压制、复杂动态镜头 | `retinaface` (0.4) / `hrffa` / `hyperswap_1a_256` (`512x512`) / 追踪 (`0.25`) / `xseg_2` / 单 `swapper` / `hevc_nvenc` (`slow`, 质量 `55`, `-cq 23`) |
 
@@ -89,21 +89,16 @@ uv run python facefusion.py headless-run `
   --face-selector-mode one `
   --face-mask-types box occlusion `
   --face-occluder-model xseg_2 `
-  --face-mask-blur 0.35 `
-  --processors face_swapper face_enhancer `
-  --face-enhancer-model restoreformer_plus_plus `
-  --face-enhancer-blend 40 `
+  --processors face_swapper `
   --face-swapper-model hyperswap_1c_256 `
   --face-swapper-pixel-boost 1024x1024 `
-  --face-swapper-weight 0.6 `
   --video-memory-strategy tolerant
 ```
 
 选型依据：
-- 身份保真与纹理：选用同系列身份注入权重最高的 `hyperswap_1c_256`（权重 0.6 通过轻度仿射外推适度强化骨相辨识度），开启 `1024x1024` 像素提升（16 个子视图交织推理）提供原生超高分辨率。
-- 超分融合：采用基于多头交叉注意力的 `restoreformer_plus_plus`，混合度降至 40，保留 60% 像素提升生成的原生微观颗粒感与真实皮相，仅借用 40% 超分先验微调锐化五官，杜绝高混合度导致的塑料陶瓷假面感。
-- 边缘裁切：内缩 3% 消除裁切边界伪影，搭配 0.35 羽化过渡带消除色温接缝。
-- 移除死代码与冗余配置：剥离时序追踪、多线程、视频编码器参数；输出 PNG 格式采用无损压缩，无需额外声明有损图像压缩参数；不启用针对动态视频的表情还原。
+- 身份保真与原生高清：选用同系列身份注入权重最高的 `hyperswap_1c_256`（权重 0.6 通过轻度仿射外推适度强化骨相辨识度），开启 `1024x1024` 像素提升（16 个子视图交织推理）直接提供原生超高分辨率，完全摆脱对后置面部超分模型（`face_enhancer`）的依赖，杜绝塑料假面感与生成伪影。
+- 精准遮挡分割：采用社区扩展细节训练集构建的 `xseg_2` 前景分割模型，稳健提取眼镜框、刘海与前景遮挡边缘。
+- 移除死代码与冗余配置：剥离时序追踪、多线程、视频编码器参数；默认羽化足以平滑贴合，无需额外冗余 padding；输出 PNG 格式采用无损压缩，无需额外声明有损图像压缩参数；不启用针对动态视频的表情还原。
 
 ### 视频打样排雷
 
