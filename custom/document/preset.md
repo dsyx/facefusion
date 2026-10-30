@@ -87,7 +87,7 @@ uv run python facefusion.py headless-run `
   -o custom/output/portrait.png `
   --face-detector-model retinaface `
   --face-selector-mode one `
-  --face-mask-types box occlusion `
+  --face-mask-types box `
   --face-occluder-model xseg_2 `
   --processors face_swapper `
   --face-swapper-model hyperswap_1c_256 `
