@@ -1,9 +1,12 @@
+import builtins
 import contextlib
+import functools
 import io
 import os
 import site
 import sys
 from pathlib import Path
+from typing import Any
 
 _INITIALIZED: bool = False
 
@@ -13,18 +16,46 @@ def setup() -> None:
 	if _INITIALIZED:
 		return
 
-	setup_terminal_encoding()
+	setup_utf8_encoding()
 	setup_dll_directories()
 
 	_INITIALIZED = True
 
 
-def setup_terminal_encoding() -> None:
+def setup_utf8_encoding() -> None:
+	os.environ['PYTHONUTF8'] = '1'
+
+	if sys.flags.utf8_mode:
+		return
+
 	for stream in (sys.stdout, sys.stderr):
 		if isinstance(stream, io.TextIOWrapper):
 			with contextlib.suppress(Exception):
 				stream.reconfigure(encoding='utf-8')
-	os.environ['PYTHONUTF8'] = '1'
+
+	@functools.wraps(io.text_encoding)
+	def utf8_text_encoding(encoding: str | None, stacklevel: int = 2) -> str:
+		return 'utf-8' if encoding is None else encoding
+
+	setattr(io, utf8_text_encoding.__name__, utf8_text_encoding)
+
+	original_open = io.open
+
+	@functools.wraps(original_open)
+	def utf8_open(
+		file: Any,
+		mode: str = 'r',
+		buffering: int = -1,
+		encoding: str | None = None,
+		*args: Any,
+		**kwargs: Any,
+	) -> Any:
+		if 'b' not in mode and encoding is None:
+			encoding = 'utf-8'
+		return original_open(file, mode, buffering, encoding, *args, **kwargs)
+
+	for module in (builtins, io):
+		setattr(module, utf8_open.__name__, utf8_open)
 
 
 def setup_dll_directories() -> None:

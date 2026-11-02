@@ -54,7 +54,7 @@ $$\vec{e}_{\text{avg}} = \frac{1}{N} \sum_{i=1}^N \vec{e}_i, \quad \hat{e}_{\tex
 > - [`facefusion/processors/modules/face_swapper/core.py:prepare_source_embedding()`](../../facefusion/processors/modules/face_swapper/core.py)
 
 首图几何基准与参考角度控制：
-- 首图几何与属性继承：多图融合仅对身份特征向量求取均值，而合并后源人脸的边界框（Bounding Box）、五官关键点、头部姿态角以及性别、年龄、人种属性均直接继承自第一张源图；同时，依赖源图外观纹理裁剪输入的换脸模型（如 `blendswap`、`uniface`）也仅读取第一张源图的画面。因此，第一张源图必须为正视镜头（俯仰角、偏航角（Yaw）、翻滚角（Roll）均 $< 10^\circ$）的高清无遮挡标准正脸。
+- 首图几何与属性继承：多图融合仅对身份特征向量求取均值，而合并后源人脸对象的边界框（Bounding Box）、五官关键点、头部姿态角以及性别、年龄、人种属性均直接继承自第一张源图；同时，依赖源图外观纹理裁剪输入的换脸模型（如 `blendswap`、`uniface`）也仅读取第一张源图的画面。因此，第一张源图必须为正视镜头（俯仰角、偏航角（Yaw）、翻滚角（Roll）均 $< 10^\circ$）的高清无遮挡标准正脸。
 - 辅助源图角度容差：后续辅助源图仅提取特征向量参与算术均值计算，用于丰富特征表征并抵消单张照片的局部阴影与光斑噪点。辅助图的偏航角建议控制在 $\pm 15^\circ$ 以内，俯仰角控制在 $\pm 10^\circ$ 以内。
 - 避免大角度侧脸：严禁混入偏航角 $> 30^\circ$ 的大角度侧脸照片。侧脸会因背光侧五官被遮挡而丢失对称特征向量，均值混合后会严重拉偏正脸特征基准，导致生成的人脸五官扁平、眼距畸变或边缘模糊。
 
@@ -116,7 +116,7 @@ UI: TRIM FRAME | CLI: --trim-frame-start | INI: [frame_extraction] trim_frame_st
 Type: integer
 Range: >= 0
 Default: None
-Note: Defaults to the first frame (0) when omitted; controlled by the start handle of the TRIM FRAME range slider in Web UI
+Note: Defaults to the first frame (0) when omitted (inclusive lower bound of [start, end)); controlled by the start handle of the TRIM FRAME range slider in Web UI
 ```
 
 指定待处理视频的起始帧索引。常用于片段调试（如跳过片头黑屏），无需在渲染前手动预剪辑视频。
@@ -128,7 +128,7 @@ UI: TRIM FRAME | CLI: --trim-frame-end | INI: [frame_extraction] trim_frame_end
 Type: integer
 Range: >= 0
 Default: None
-Note: Defaults to the last frame when omitted; controlled by the end handle of the TRIM FRAME range slider in Web UI
+Note: Defaults to the last frame when omitted (exclusive upper bound of [start, end)); controlled by the end handle of the TRIM FRAME range slider in Web UI
 ```
 
 指定待处理视频的截止帧索引。
@@ -165,7 +165,7 @@ Default: yolo_face
 
 | 模型 | 底层权重 | 参数量 | 算力 | WIDER FACE AP ($\uparrow$)<br/>(Easy / Medium / Hard) | 架构特性 | 适用场景 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `many` | `retinaface_10g` + `scrfd_2.5g` + `yoloface_8n` | ~8.06M | ~20.6 GFLOPs | - | 并行汇总三组候选框，经非极大值抑制（NMS，Non-Maximum Suppression）去重融合（阈值 `0.1`） | 极端疑难帧兜底（计算耗时叠加） |
+| `many` | `retinaface_10g` + `scrfd_2.5g` + `yoloface_8n` | ~8.06M | ~20.6 GFLOPs | - | 依次运行三组模型并汇总候选框，经非极大值抑制（NMS，Non-Maximum Suppression）去重融合（阈值 `0.1`） | 极端疑难帧兜底（计算耗时叠加） |
 | `retinaface` | `retinaface_10g`<br/>(`SCRFD_10G_KPS`) | ~4.23M | 10.0 GFLOPs (640×480) | **95.4% / 94.0% / 82.8%** | 沿用 InsightFace `RetinaFace` 接口命名，底层实为高容量 `SCRFD-10GF` 密集锚框与 5 点关键点多任务网络 | 远景微小人脸、重度遮挡与暗光场景首选 |
 | `scrfd` | `scrfd_2.5g`<br/>(`SCRFD_2.5G_KPS`) | ~0.82M | 2.5 GFLOPs (640×480) | 93.8% / 92.0% / 77.1% | 基于样本与计算重分配（SCRFD，Sample and Computation Redistribution for Efficient Face Detection）的轻量级特征金字塔架构 | 侧脸与大角度动作高性价比抓取 |
 | `yolo_face` | `yoloface_8n` | ~3.01M | 8.1 GFLOPs (640×640) | 93.8% / 91.8% / 79.4% | 无锚框（Anchor-Free）单阶段直接回归架构，背景误检率低 | 正脸及中近景高速通用检测 |
@@ -260,9 +260,9 @@ Default: 2dfan4
 
 | 模型 | 算法架构与回归机制 | 基准特性与置信度机制 | 适用场景 |
 | :--- | :--- | :--- | :--- |
-| `2dfan4` | 4 层堆叠沙漏网络（Stacked Hourglass Network），输出高斯热力图；暗光下（CIE Lab 亮度均值 $< 30$）自动启用对比度受限自适应直方图均衡化（CLAHE，Contrast Limited Adaptive Histogram Equalization）增强 | 300-W 基准 NME ~3.5%，热力图空间约束强，输出真实热力峰值置信度 | 抗局部遮挡与中近景五官定位稳健，适合绝大多数常规及半遮挡视频 |
-| `hrffa` | 以 DINOv3 ViT-L/16 为教师网络知识蒸馏出的大角度鲁棒快速人脸对齐网络（HRFFA，High-Angle Robust Fast Face Alignment）轻量学生模型，将检测框外扩 $1.7\times$ 覆盖完整头部后直接回归坐标 | 专为极端俯仰角（$\pm 85^\circ$）、偏航角（$\pm 90^\circ$）及 $360^\circ$ 翻滚角设计；底层硬编码置信度恒为 `1.0` | 大幅度仰头/低头、大角度侧脸及剧烈运动镜头首选 |
-| `many` | 并行运行 `2dfan4` 与 `peppa_wutz` | 当 $\text{score}_{\text{2dfan4}} > \text{score}_{\text{peppa\_wutz}} - 0.2$ 时优先采纳 `2dfan4`，否则由 `peppa_wutz` 兜底 | 复杂姿态与暗光交替场景的双模冗余增强 |
+| `2dfan4` | 4 层堆叠沙漏网络（Stacked Hourglass Network），输出高斯热力图；暗光下（CIE Lab 亮度均值 $< 30$）自动启用对比度受限自适应直方图均衡化（CLAHE，Contrast Limited Adaptive Histogram Equalization）增强 | 300-W 基准 NME ~3.5%，热力图紧贴可见 2D 面部边缘，输出真实热力峰值置信度（侧转背身 $>90^\circ$ 时自动降分触发 5 点回退） | 常规视频、含 $360^\circ$ 转身甩头的舞蹈视频及半遮挡镜头首选 |
+| `hrffa` | 以 DINOv3 ViT-L/16 为教师网络知识蒸馏出的大角度鲁棒快速人脸对齐网络（HRFFA，High-Angle Robust Fast Face Alignment）轻量学生模型，将检测框外扩 $1.7\times$ 覆盖完整头部后直接回归坐标 | 专为极端俯仰角（$\pm 85^\circ$）与平面内 $360^\circ$ 翻滚角设计；但底层硬编码置信度恒为 `1.0`（无法触发阈值回退），且大侧脸转头时其全头 3D 不可见点投影易将收敛后的 5 点对齐模板拉向鬓角与耳部 | 仅限人脸持续朝向镜头的卧姿、倒立等大翻滚角或极端俯仰角镜头按需选用 |
+| `many` | 依次运行 `2dfan4` 与 `peppa_wutz` | 当 $\text{score}_{\text{2dfan4}} > \text{score}_{\text{peppa\_wutz}} - 0.2$ 时优先采纳 `2dfan4`，否则由 `peppa_wutz` 兜底 | 复杂姿态与暗光交替场景的双模冗余增强 |
 | `peppa_wutz` | 轻量级卷积直接回归网络，同样支持暗光 CLAHE 增强 | 推理开销低，但在大表情与大侧脸场景下的 NME 高于热力图架构 | 低算力环境单跑，或配合 `many` 模式作为置信度互补 |
 
 系统基于随机抽样一致算法（RANSAC，Random Sample Consensus）对检测到的 5 个核心基准关键点与各处理器模型内置的标准人脸对齐模板拟合相似变换（Similarity Transformation）矩阵 $M \in \text{Sim}(2)$，作为局部人脸几何对齐、规范化裁切与后续逆贴回的基准：
@@ -423,7 +423,7 @@ Default: 0.0
 Note: Requires TARGET FRAME AMOUNT >= 1 to take effect
 ```
 
-人脸多帧追踪重合度阈值，基于时序边界框交并比（IoU，Intersection over Union）。设为大于 `0`（如 `0.20` ~ `0.30`）时开启时序追踪。当中心帧发生偶发漏检时，系统在 $[t - K, t + K]$ 时序窗口内匹配前后检出人脸的锚点帧（满足 $\text{IoU} > \theta_{\text{tracker}}$），对中间漏检帧的边界框、关键点与姿态角执行线性插值（Linear Interpolation）并复用前置锚点帧特征向量，从而消除断连闪烁。
+人脸多帧追踪重合度阈值，基于时序边界框交并比（IoU，Intersection over Union）。设为大于 `0`（如 `0.20` ~ `0.30`）时开启时序追踪。当中心帧发生偶发漏检时，系统在 $[t - K, t + K]$ 时序窗口内匹配前后检出人脸的锚点帧（满足 $\text{IoU} > \theta_{\text{tracker}}$），对中间漏检帧的边界框与关键点执行线性插值（Linear Interpolation），基于插值后的 `'68/5'` 关键点重新估算头部姿态角，并根据插值权重 $w$ 复用时间距离更近的锚点帧特征向量与属性（当 $w < 0.5$ 时取前置锚点帧，当 $w \ge 0.5$ 时取后置锚点帧），从而消除断连闪烁。
 
 > 参考：
 > - [`facefusion/face_tracker.py:track_faces()`](../../facefusion/face_tracker.py)
@@ -680,7 +680,7 @@ Step: 0.05
 Default: 0.3
 ```
 
-控制矩形边缘的高斯模糊过渡带宽。高斯核标准差 $\sigma$ 与裁切宽度 $W_{\text{crop}}$ 及模糊系数成正比：
+控制矩形遮罩（`box`）边缘的高斯模糊过渡带宽（注：`occlusion`、`area` 与 `region` 遮罩固定采用 $\sigma=5$ 的高斯平滑，不受此参数控制）。高斯核标准差 $\sigma$ 与裁切宽度 $W_{\text{crop}}$ 及模糊系数成正比：
 
 $$\text{blur\_amount} = \lfloor W_{\text{crop}} \times 0.5 \times \text{blur} \rfloor$$
 
@@ -728,7 +728,7 @@ Note: Only effective when occlusion is enabled in FACE MASK TYPES
 
 | 模型 | 架构与训练集演进 | 分割边界特性 | 适用场景 |
 | :--- | :--- | :--- | :--- |
-| `many` | 并行运行 `xseg_1`、`xseg_2`、`xseg_3` | 对三组预测遮罩逐像素取最小值交集（$\min(M_1, M_2, M_3)$），即任一模型判定为遮挡物即予以剔除 | 穿模极其严重的复杂遮挡镜头（耗时增加 2 倍，且可能略微收缩有效换脸边缘） |
+| `many` | 依次运行 `xseg_1`、`xseg_2`、`xseg_3` | 对三组预测遮罩逐像素取最小值交集（$\min(M_1, M_2, M_3)$），即任一模型判定为遮挡物即予以剔除 | 穿模极其严重的复杂遮挡镜头（耗时增加 2 倍，且可能略微收缩有效换脸边缘） |
 | `xseg_1` | DeepFaceLab 官方基础训练集 | 倾向于生成完整保守的面部椭圆轮廓，漏检率低，对大块前景障碍物分割稳健 | 无细碎遮挡的常规画面通用首选 |
 | `xseg_2` | 社区扩展高频细节训练集 | 强化了对细碎刘海发丝、手指缝隙、黑框眼镜与麦克风边缘的高频 Alpha 扣取 | 目标人物存在额前碎发遮眼、手部托腮或近景话筒遮挡时首选 |
 | `xseg_3` | 侧脸与复杂光影补充训练集 | 优化了大角度侧脸外轮廓及强阴影交界处的遮罩贴合度，减少侧脸背光侧误剔除 | 大角度侧头动作或强侧光/逆光场景选用 |
