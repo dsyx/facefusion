@@ -260,18 +260,19 @@ Default: 2dfan4
 
 | 模型 | 算法架构与回归机制 | 基准特性与置信度机制 | 适用场景 |
 | :--- | :--- | :--- | :--- |
-| `2dfan4` | 4 层堆叠沙漏网络（Stacked Hourglass Network），输出高斯热力图；暗光下（CIE Lab 亮度均值 $< 30$）自动启用对比度受限自适应直方图均衡化（CLAHE，Contrast Limited Adaptive Histogram Equalization）增强 | 300-W 基准 NME ~3.5%，热力图紧贴可见 2D 面部边缘，输出真实热力峰值置信度（侧转背身 $>90^\circ$ 时自动降分触发 5 点回退） | 常规视频、含 $360^\circ$ 转身甩头的舞蹈视频及半遮挡镜头首选 |
-| `hrffa` | 以 DINOv3 ViT-L/16 为教师网络知识蒸馏出的大角度鲁棒快速人脸对齐网络（HRFFA，High-Angle Robust Fast Face Alignment）轻量学生模型，将检测框外扩 $1.7\times$ 覆盖完整头部后直接回归坐标 | 专为极端俯仰角（$\pm 85^\circ$）与平面内 $360^\circ$ 翻滚角设计；但底层硬编码置信度恒为 `1.0`（无法触发阈值回退），且大侧脸转头时其全头 3D 不可见点投影易将收敛后的 5 点对齐模板拉向鬓角与耳部 | 仅限人脸持续朝向镜头的卧姿、倒立等大翻滚角或极端俯仰角镜头按需选用 |
+| `2dfan4` | 4 层堆叠沙漏网络（Stacked Hourglass Network），输出高斯热力图；暗光下（CIE Lab 亮度均值 $< 30$）自动启用对比度受限自适应直方图均衡化（CLAHE，Contrast Limited Adaptive Histogram Equalization）增强 | 300-W 基准 NME ~3.5%，热力图紧贴可见 2D 面部边缘，输出真实热力峰值置信度（侧转背身 $>90^\circ$ 时自动降分并配合补丁触发低分与背面剔除） | 常规视频、含 $360^\circ$ 转身甩头的舞蹈视频及半遮挡镜头首选 |
+| `hrffa` | 以 DINOv3 ViT-L/16 为教师网络知识蒸馏出的大角度鲁棒快速人脸对齐网络（HRFFA，High-Angle Robust Fast Face Alignment）轻量学生模型，将检测框外扩 $1.7\times$ 覆盖完整头部后直接回归坐标 | 专为极端俯仰角（$\pm 85^\circ$）与平面内 $360^\circ$ 翻滚角设计；但底层硬编码置信度恒为 `1.0`（无法利用置信度阈值过滤误检框），且大侧脸转头时其全头 3D 不可见点投影易将收敛后的 5 点对齐模板拉向鬓角与耳部 | 仅限人脸持续朝向镜头的卧姿、倒立等大翻滚角或极端俯仰角镜头按需选用 |
 | `many` | 依次运行 `2dfan4` 与 `peppa_wutz` | 当 $\text{score}_{\text{2dfan4}} > \text{score}_{\text{peppa\_wutz}} - 0.2$ 时优先采纳 `2dfan4`，否则由 `peppa_wutz` 兜底 | 复杂姿态与暗光交替场景的双模冗余增强 |
 | `peppa_wutz` | 轻量级卷积直接回归网络，同样支持暗光 CLAHE 增强 | 推理开销低，但在大表情与大侧脸场景下的 NME 高于热力图架构 | 低算力环境单跑，或配合 `many` 模式作为置信度互补 |
 
-系统基于随机抽样一致算法（RANSAC，Random Sample Consensus）对检测到的 5 个核心基准关键点与各处理器模型内置的标准人脸对齐模板拟合相似变换（Similarity Transformation）矩阵 $M \in \text{Sim}(2)$，作为局部人脸几何对齐、规范化裁切与后续逆贴回的基准：
+系统基于随机抽样一致算法（RANSAC，Random Sample Consensus）对检测到的 5 个核心基准关键点与各处理器模型内置的标准人脸对齐模板拟合相似变换（Similarity Transformation）矩阵 $M \in \text{Sim}(2)$，作为局部人脸几何对齐、规范化裁切与后续逆贴回的基准（[`custom/patch/common.py:fix_face_alignment()`](../patch/common.py) 已修复上游 `ransacReprojThreshold` 未随 `crop_size` 缩放导致大侧脸误剔除内点的缺陷）：
 
 $$\min_{M} \sum_{i=1}^5 \left\| M \begin{bmatrix} x_i \\ y_i \\ 1 \end{bmatrix} - \vec{t}_i \right\|^2$$
 
 > 参考：
 > - [`facefusion/face_landmarker.py:detect_face_landmark()`](../../facefusion/face_landmarker.py)
 > - [`facefusion/face_helper.py:estimate_matrix_by_face_landmark_5()`](../../facefusion/face_helper.py)
+> - [`custom/patch/common.py:fix_face_alignment()`](../patch/common.py)
 > - [How far are we from solving the 2D & 3D Face Alignment problem? (ICCV 2017)](https://arxiv.org/abs/1703.07332)
 > - [HRFFA: High-Angle Robust Fast Face Alignment (PINTO0309)](https://github.com/PINTO0309/High-Angle_Robust_Fast_FaceAlignment)
 
@@ -282,16 +283,19 @@ UI: FACE LANDMARKER SCORE | CLI: --face-landmarker-score | INI: [face_landmarker
 Range: 0.0 - 1.0
 Step: 0.05
 Default: 0.5
-Note: Avoid setting this to 1.0 when using hrffa, as hrffa uses a fixed confidence score of 1.0 and requires a threshold strictly below 1.0
+Note: hrffa returns a fixed confidence score of 1.0 and cannot filter false-positive detections by score
 ```
 
-人脸关键点检测置信度阈值。FaceFusion 采用双层关键点处理管线：第一层常驻无条件运行 `fan_68_5` 模型，基于检测器输出的初始 5 点关键点回归初始 68 点（`'68/5'`），用于估算头部姿态旋转角及提供全局拓扑兜底；第二层由 `face_landmarker_score` 控制精修流程：
-- 当阈值 $> 0$ 时，触发所选第二级 68 点精修模型（`2dfan4` / `peppa_wutz` / `hrffa`）的推理；若精修得分高于该阈值，系统采纳精修 68 点并收敛映射为高精度 5 点关键点（`'5/68'`），供下游特征提取与仿射对齐；
-- 若得分低于阈值或设为 `0`（跳过第二级精修模型），系统将直接回退采用人脸检测器输出的初始 5 点关键点（不会丢弃人脸）。
+人脸关键点检测置信度阈值。FaceFusion 采用双层关键点处理管线：第一层常驻无条件运行 `fan_68_5` 模型，基于检测器输出的初始 5 点关键点回归初始 68 点（`'68/5'`），用于估算头部姿态旋转角及提供全局拓扑兜底；第二层由 `face_landmarker_score` 控制精修与过滤流程（经 [`custom/patch/common.py:fix_face_filter()`](../patch/common.py) 修正）：
+- 当阈值 $> 0$ 时，触发所选第二级 68 点精修模型（`2dfan4` / `peppa_wutz` / `hrffa`）的推理：
+  - 若精修得分 $\ge$ 该阈值且双眼水平投影朝向正常（未发生 $> 90^\circ$ 背身翻转），系统采纳精修 68 点并收敛映射为高精度 5 点关键点（`'5/68'`），供下游特征提取与仿射对齐；
+  - 若精修得分 $<$ 该阈值或双眼水平投影发生反向交叉（$> 90^\circ$ 背头/耳部误检），补丁将直接剔除该候选框（修正了上游静默回退至检测器粗糙 5 点强行换脸及 `>` 边界比较的缺陷）。
+- 当阈值设为 `0` 时，跳过第二级精修模型与过滤，直接使用人脸检测器输出的初始 5 点关键点。
 
 > 参考：
 > - [`facefusion/face_creator.py:create_faces()`](../../facefusion/face_creator.py)
 > - [`facefusion/face_landmarker.py:estimate_face_landmark_68_5()`](../../facefusion/face_landmarker.py)
+> - [`custom/patch/common.py:fix_face_filter()`](../patch/common.py)
 
 ## 人脸筛选、定位与时序跟踪
 
