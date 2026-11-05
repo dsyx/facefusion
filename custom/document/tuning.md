@@ -288,14 +288,16 @@ Note: hrffa returns a fixed confidence score of 1.0 and cannot filter false-posi
 
 人脸关键点检测置信度阈值。FaceFusion 采用双层关键点处理管线：第一层常驻无条件运行 `fan_68_5` 模型，基于检测器输出的初始 5 点关键点回归初始 68 点（`'68/5'`），用于估算头部姿态旋转角及提供全局拓扑兜底；第二层由 `face_landmarker_score` 控制精修与过滤流程（经 [`custom/patch/common.py:fix_face_filter()`](../patch/common.py) 修正）：
 - 当阈值 $> 0$ 时，触发所选第二级 68 点精修模型（`2dfan4` / `peppa_wutz` / `hrffa`）的推理：
-  - 若精修得分 $\ge$ 该阈值且双眼水平投影朝向正常（未发生 $> 90^\circ$ 背身翻转），系统采纳精修 68 点并收敛映射为高精度 5 点关键点（`'5/68'`），供下游特征提取与仿射对齐；
-  - 若精修得分 $<$ 该阈值或双眼水平投影发生反向交叉（$> 90^\circ$ 背头/耳部误检），补丁将直接剔除该候选框（修正了上游静默回退至检测器粗糙 5 点强行换脸及 `>` 边界比较的缺陷）。
+  - 若精修得分 $\ge$ 该阈值且仿射重投影几何残差合规（$\text{RMSE}_{\text{norm}} < 0.075$，且双眼未发生 $\Delta x \le 0$ 背身翻转），系统采纳精修 68 点并收敛映射为高精度 5 点关键点（`'5/68'`），供下游特征提取与仿射对齐；
+  - 若精修得分 $<$ 该阈值，或双眼水平投影发生反向交叉（$\Delta x \le 0$ 背头/耳部误检），或归一化相似变换重投影残差 $\text{RMSE}_{\text{norm}} \ge 0.075$（大侧脸单眼遮挡拓扑崩塌），补丁将直接剔除该候选框；
+  - 在下游换脸时，[`custom/patch/common.py:fix_face_swapper_fade()`](../patch/common.py) 会在 $\text{RMSE}_{\text{norm}} \in [0.055, 0.075]$ 的临界过渡区间自动执行余弦平滑衰减融合（Cosine Fade），彻底消除硬切闪烁与大侧脸怪异嘴唇穿帮。
 - 当阈值设为 `0` 时，跳过第二级精修模型与过滤，直接使用人脸检测器输出的初始 5 点关键点。
 
 > 参考：
 > - [`facefusion/face_creator.py:create_faces()`](../../facefusion/face_creator.py)
 > - [`facefusion/face_landmarker.py:estimate_face_landmark_68_5()`](../../facefusion/face_landmarker.py)
 > - [`custom/patch/common.py:fix_face_filter()`](../patch/common.py)
+> - [`custom/patch/common.py:fix_face_swapper_fade()`](../patch/common.py)
 
 ## 人脸筛选、定位与时序跟踪
 
