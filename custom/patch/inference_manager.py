@@ -1,11 +1,15 @@
+import threading
+
 from onnxruntime import InferenceSession
 
 import facefusion.choices
 from facefusion import inference_manager
 from facefusion.filesystem import get_file_name
-from facefusion.types import InferenceOptionSet, InferenceProvider
+from facefusion.types import DownloadSet, InferenceOptionSet, InferencePool, InferenceProvider
 
 _INITIALIZED = False
+_INFERENCE_POOL_LOCKS: dict[tuple[str, tuple[str, ...]], threading.Lock] = {}
+_INFERENCE_POOL_LOCKS_GUARD = threading.Lock()
 
 TENSORRT_FP16_MODELS: frozenset[str] = frozenset(
 	{
@@ -22,6 +26,7 @@ def setup() -> None:
 		return
 
 	enable_tensorrt_fp16()
+	enable_inference_pool_lock()
 
 	_INITIALIZED = True
 
@@ -67,3 +72,33 @@ def enable_tensorrt_fp16() -> None:
 		return original_create_inference_session(model_path, adjusted_providers)
 
 	setattr(inference_manager, 'create_inference_session', create_inference_session)
+
+
+def resolve_inference_pool_lock(module_name: str, model_names: list[str]) -> threading.Lock:
+	pool_key = (module_name, tuple(model_names))
+	with _INFERENCE_POOL_LOCKS_GUARD:
+		pool_lock = _INFERENCE_POOL_LOCKS.get(pool_key)
+		if pool_lock is None:
+			pool_lock = threading.Lock()
+			_INFERENCE_POOL_LOCKS[pool_key] = pool_lock
+		return pool_lock
+
+
+def enable_inference_pool_lock() -> None:
+	original_get_inference_pool = inference_manager.get_inference_pool
+	original_clear_inference_pool = inference_manager.clear_inference_pool
+
+	def get_inference_pool(
+		module_name: str,
+		model_names: list[str],
+		model_source_set: DownloadSet,
+	) -> InferencePool:
+		with resolve_inference_pool_lock(module_name, model_names):
+			return original_get_inference_pool(module_name, model_names, model_source_set)
+
+	def clear_inference_pool(module_name: str, model_names: list[str]) -> None:
+		with resolve_inference_pool_lock(module_name, model_names):
+			original_clear_inference_pool(module_name, model_names)
+
+	setattr(inference_manager, 'get_inference_pool', get_inference_pool)
+	setattr(inference_manager, 'clear_inference_pool', clear_inference_pool)
